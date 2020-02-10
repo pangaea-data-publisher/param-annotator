@@ -27,11 +27,11 @@ app = Flask(__name__)
 termInstance = None
 dftopic = None
 
-@app.route('/pangterm')
+@app.route('/param-annotator')
 def home():
     return "Hello, World!"
 
-@app.route('/pangterm/api', methods=['GET'])
+@app.route('/param-annotator/api', methods=['GET'])
 def getTerm():
     unit=None
     paramName=None
@@ -98,7 +98,7 @@ def getTerm():
                         paramName = paramName[:-len(m.group(0))]
                         #paramName = paramName.replace(m.group(0),'')
                     logging.debug('Extracted units : %s',ucum_unit)
-                    logging.debug('Final param : %s', paramName)
+                    logging.debug('Final param after units extraction : %s', paramName)
 
     #if unit:
         #ucum_jsn = termInstance.getUcumQuantity(unit)
@@ -117,15 +117,18 @@ def getTerm():
             match_type = None
             idscore_dict = None
             # full match w/o fuzzy
-            idscore_dict = termInstance.executeTermQuery(f, False, False,user_terminolgy,'fullmatch')
+            #idscore_dict = termInstance.executeTermQuery(f, False, False,user_terminolgy,'fullmatch')
+            idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'fullmatch')
             match_type = 'full'
             if not idscore_dict:
                 # full match with fuzzy
-                idscore_dict = termInstance.executeTermQuery(f, False, True,user_terminolgy,'fuzzy_fullmatch')
+                #idscore_dict = termInstance.executeTermQuery(f, False, True,user_terminolgy,'fuzzy_fullmatch')
+                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'fuzzy_fullmatch')
                 match_type = 'fuzzy'
             if not idscore_dict:
                 # shingle match
-                idscore_dict = termInstance.executeTermQuery(f, True, False,user_terminolgy,'shinglematch')
+                #idscore_dict = termInstance.executeTermQuery(f, True, False,user_terminolgy,'shinglematch')
+                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'shinglematch')
                 match_type = 'shingle'
 
             results_dict = {}
@@ -144,7 +147,9 @@ def getTerm():
                 results_dict['match_type'] = match_type
             else:
                 results_dict['match_type'] = None
-            results_dict['term'] = idscore_dict
+            #results_dict['term'] = idscore_dict
+            # sort terms dict by score
+            results_dict['term'] = sorted(idscore_dict, key=lambda i: i['score'], reverse=True)
             term_jsn.append(results_dict)
 
     if ucum_jsn or term_jsn:
@@ -165,7 +170,7 @@ if __name__ == '__main__':
     import gevent.monkey
     gevent.monkey.patch_all()
 
-    logging.basicConfig(level=logging.INFO, filename='pangterm.log', filemode="a+",
+    logging.basicConfig(level=logging.INFO, filename='param-annotator.log', filemode="a+",
                         format="%(asctime)s %(levelname)s %(message)s")
     root = logging.getLogger()
     root.setLevel(logging.INFO)
@@ -206,11 +211,14 @@ if __name__ == '__main__':
                         header=0, converters={'TopicId': int, 'TerminologyId': int})
     dftopic = dftopic[dftopic.TerminologyId.notnull()]
 
-    min_match = config['INPUT']['min_match_percent']+"%"
+    #min_match = config['INPUT']['min_match_percent']+"%"
     min_sim_value = float(config['INPUT']['min_sim_value'])
     #logging.info('Ucum Service :%s', ucum_service)
-    termInstance = term.Term(ucum_service,elastic_host,elastic_index,elastic_doctype,elastic_port,tertiary_terminologies,
-                             secondary_terminologies,primary_terminologies,query_size_full,query_size_shingle,min_match,min_sim_value)
+    #termInstance = term.Term(ucum_service,elastic_host,elastic_index,elastic_doctype,elastic_port,tertiary_terminologies,
+                             #secondary_terminologies,primary_terminologies,query_size_full,query_size_shingle,min_match,min_sim_value)
+    termInstance = term.Term(ucum_service, elastic_host, elastic_index, elastic_doctype, elastic_port,
+                             tertiary_terminologies,
+                             secondary_terminologies, primary_terminologies, query_size_full, query_size_shingle, min_sim_value)
 
     #app.run(debug=True)
     server = WSGIServer((host, port), app,log = None)

@@ -1,7 +1,7 @@
 import requests
 import urllib.parse
 import json
-import unidecode
+from unidecode import unidecode
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search, Q
 from nltk.tokenize import RegexpTokenizer
@@ -83,13 +83,14 @@ class Term:
     #chemistry_terminologies = None
     query_size_full = None
     query_size_shingle = None
-    min_match = None
+    #min_match = None
     min_sim_value=None
     ptn_bracket = None
     ptn_digit = None
     elastic_shingle_tokenizer = "http://ws.pangaea.de/es/pangaea-terms/_analyze?analyzer=terms_folding&text="
 
-    def __init__(self, uservice,host,index,doctype,port,termi3,termi2,termi, size_full,size_shingle,minmatch, minsim):
+    #def __init__(self, uservice,host,index,doctype,port,termi3,termi2,termi, size_full,size_shingle,minmatch, minsim):
+    def __init__(self, uservice, host, index, doctype, port, termi3, termi2, termi, size_full, size_shingle, minsim):
         self.UCUM_SERVICE_QUANTITY = uservice
         self.elastic_host=host
         self.elastic_index = index
@@ -102,7 +103,7 @@ class Term:
         #self.chemistry_terminologies=termichem
         self.query_size_full = size_full
         self.query_size_shingle = size_shingle
-        self.min_match = minmatch
+        #self.min_match = minmatch
         self.min_sim_value=minsim
 
         self.ptn_pang_replace_onqual = r'\b({})(?:\s|$)'.format('|'.join(self.pang_replace_onqual))
@@ -169,9 +170,9 @@ class Term:
         #         string_to_process = string_to_process.replace(span.text,'')
         #     string_to_process = re.sub(' +', ' ', string_to_process)
 
-        # TO-DO: process author,sensu...
+        # exclude author,sensu...# (Jennerjahn & Ittekkot, 1997)
         string_to_process = re.sub(r'\([a-zA-Z]+\s*\&\s*[a-zA-Z]+,?\s*\d+\)$', '',
-                                   string_to_process)  # (Jennerjahn & Ittekkot, 1997)
+                                   string_to_process)
         if re.search(r'\b(sensu)\b', string_to_process):
             if not re.search(r'\slato\s|\sstricto\s', string_to_process):
                 string_to_process = string_to_process.split("sensu", 1)[0].strip()
@@ -255,15 +256,16 @@ class Term:
             print(e)
         return ucum_dict
 
-    def executeTermQuery(self,t, isShingleMatch, isFuzzy, user_terminology,query_type):
+    #def executeTermQuery(self,t, isShingleMatch, isFuzzy, user_terminology,query_type):
+    def executeTermQuery(self, t, user_terminology, query_type):
         size = self.query_size_full
         #convert the first letter of fragment to lowercase if first word of the fragment contains only alphabets
 
         if (query_type == "fullmatch"):
             q1 = Q({"multi_match": {"query": t, "fuzziness": 0, "fields":[ "name.fullmatch_exact^5", "name.fullmatch_folding" ]}})
         elif (query_type == "fuzzy_fullmatch"):
-            q_a = Q({"multi_match": {"query": t, "fuzziness": 1, "fields":[ "name.fullmatch_exact^5", "name.fullmatch_folding" ]}})
-            q_b = Q({"multi_match": {"query": t, "fuzziness": "AUTO", "fields":[ "name.fullmatch_exact^5", "name.fullmatch_folding" ]}})
+            q_a = Q({"multi_match": {"query": t, "fuzziness": 1, "prefix_length":1, "fields":[ "name.fullmatch_exact^5", "name.fullmatch_folding" ]}})
+            q_b = Q({"multi_match": {"query": t, "fuzziness": "AUTO", "prefix_length":1,"fields":[ "name.fullmatch_exact^5", "name.fullmatch_folding" ]}})
             q1 = Q('bool', should=[q_a,q_b])
         else:
             size = self.query_size_shingle
@@ -300,9 +302,9 @@ class Term:
                 list_res.append(dictres)
             max_score = response['hits']['max_score']
             if list_res:
-                fragment_list = t.split()
-                #print('fragment_list',fragment_list)
                 if query_type == "shinglematch":
+                    fragment_list = t.split()
+                    #print('fragment_list',fragment_list)
                     t = t.lower()
                     list_resval = [d['name'].lower() for d in list_res]
                     # list_resid = [d['id'] for d in list_res]
@@ -315,6 +317,7 @@ class Term:
                     # print('options:',options)
                     # dict_grams = self.generateCombinations(list_res_low,len(fragment_list),max_score_names)
                     length_fragments = len(fragment_list)
+                    #print('length_fragments: ',length_fragments)
                     dict_grams = self.generateCombinations(list_resval, length_fragments)
                     max_keys = self.get_max_cosine_sim(dict_grams.keys(), t,length_fragments)
                     # max_keys = self.fuzzy_process_extractBests(list(dict_grams.keys()), t)
@@ -362,9 +365,10 @@ class Term:
     #def generateCombinations(self,options,len_fragment, max_terms):
     def generateCombinations(self, options, len_fragment):
         dict_grams = {}
+        #print('options',options)
         #for i in range(1, len(options) + 1):
         for i in range(1, len_fragment+1):
-            for subset in itertools.combinations(options, i):
+            for subset in itertools.combinations(options, i): #return i-length tuples in sorted order with no repeated elements.
                 combined = ' '.join(subset) # e.g, subset -> ('carbon', 'magnetic flux')
                 #a longer string can never be a substring of a shorter/equal length string
                 if (len(combined.split()) <= len_fragment+1):
@@ -374,6 +378,7 @@ class Term:
                     dict_grams[combined] = set_subset # e.g., surface water temperature ('surface water', 'temperature')
                     # or surface water water ('surface water', 'water')
         #print(len(dict_grams))
+        #print(dict_grams)
         return dict_grams
 
     # def preprocess_terms(self, text):
@@ -419,7 +424,7 @@ class Term:
         mappings = {"alpha": "α", "beta": "β","gamma":"γ"}
         for key in mappings.keys():
             text = text.replace(key, mappings[key])
-        text = unidecode.unidecode(text)
+        text = unidecode(text)
         words = tokenizer.tokenize(text)
         #Param:  Highly hydroxy-interlayered vermiculite
         # if list :  ['hydroxy-interlayered vermiculite', 'vermiculite']
@@ -430,7 +435,7 @@ class Term:
         return Counter(words)
 
     def process_and_vectorize_string(self,text):
-        text = unidecode.unidecode(text)
+        text = unidecode(text)
         words = tokenizer.tokenize(text)
         words = {stemmer.stem(tkn) for tkn in words}
         return ' '.join(words)
