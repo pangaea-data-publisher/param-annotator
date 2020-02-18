@@ -20,6 +20,7 @@ from fuzzywuzzy import process
 from collections import Counter
 import math
 from nltk.corpus import stopwords
+from stop_words import get_stop_words
 from nltk.stem import WordNetLemmatizer
 from nltk.stem.snowball import SnowballStemmer
 class Term:
@@ -33,15 +34,29 @@ class Term:
 
     pang_replace_general =["\.?\-?group$", "\-?type$", "agg\."]
     global split_words
-    split_words = ['the','and', 'aboard', 'about', 'above', 'across', 'after', 'against', 'along', 'amid', 'among', 'anti',
-                   'around', 'as', 'at', 'before', 'behind','below', 'between', 'beneath', 'beside', 'besides', 'beyond', 'but', 'by', 'concerning',
-                   'considering', 'despite', 'down', 'during', 'except', 'excepting', 'excluding', 'following', 'for',
-                   'from', 'in','inside', 'into', 'like', 'minus', 'near', 'or','of', 'off', 'on', 'onto', 'opposite', 'out', 'outside',
-                   'over', 'past', 'regarding', 'round', 'save', 'since', 'than','through', 'to', 'towards', 'under',
-                   'underneath', 'unlike', 'until', 'up', 'upon', 'versus', 'via',
-                   'with', 'within', 'without', 'targed with']
+    #comment out 22-02-2020
+    # split_words = ['the','and', 'aboard', 'about', 'above', 'across', 'after', 'against', 'along', 'amid', 'among', 'anti',
+    #                'around', 'as', 'at', 'before', 'behind','below', 'between', 'beneath', 'beside', 'besides', 'beyond', 'but', 'by', 'concerning',
+    #                'considering', 'despite', 'down', 'during', 'except', 'excepting', 'excluding', 'following', 'for',
+    #                'from', 'in','inside', 'into', 'like', 'minus', 'near', 'or','of', 'off', 'on', 'onto', 'opposite', 'out', 'outside',
+    #                'over', 'past', 'regarding', 'round', 'save', 'since', 'than','through', 'to', 'towards', 'under',
+    #                'underneath', 'unlike', 'until', 'up', 'upon', 'versus', 'via',
+    #                'with', 'within', 'without', 'targed with']
+    split_words_special = ['aboard', 'across', 'along', 'amid', 'among', 'anti',
+                           'around', 'behind', 'beneath', 'beside', 'besides', 'beyond', 'concerning',
+                           'considering', 'despite', 'except', 'excepting', 'excluding', 'following', 'inside', 'like',
+                           'minus', 'near', 'onto', 'opposite',
+                           'outside', 'past', 'regarding', 'round', 'save', 'since', 'towards',
+                           'underneath', 'unlike', 'upon', 'versus', 'via',
+                           'within', 'without', 'targed with']
+    stop_words = list(get_stop_words('en'))  # Have around 900 stopwords
+    nltk_words = list(stopwords.words('english'))  # Have around 150 stopwords
+    stop_words.extend(nltk_words)
+    stop_words = [s for s in stop_words if len(s) != 1]#exclude 1 chat stop word from analysis (e.g., a)
+    split_words = split_words_special+stop_words
+
     pang_split_words = ['per', 'per unit', 'per unit mass','per unit area', 'per unit volume', 'per unit length',
-                        'forma', 'plus', 'others','nm', 'unknown','targeted with', 'spp.']
+                        'forma', 'plus', 'others','nm', 'unknown','targeted with', 'spp.', 'given']
     pang_split_incl = ['downward', 'upward', 'size','juvenile','particulate organic carbon','normalized','mixing ratio','ratio',
                        'mean','minimum', 'maximum', 'standard deviation','fraction','minerals']
     #12.08.2019
@@ -49,9 +64,9 @@ class Term:
 
     #split words based on splitword_all
 
-    splitword_all = split_words+pang_split_words +  pang_split_incl
+    splitword_all = list(set(split_words+pang_split_words+pang_split_incl))
     #exclude 'splitword_all_replace_only' after the split
-    splitword_all_replace_only = pang_split_words + split_words
+    splitword_all_replace_only = list(set(pang_split_words + split_words))
 
     # pang_qualifiers = ["aff\.", "cf\.", "ex gr\.", "gr\.", "nov\.", "subgen\.", "gen\.?",
     #                    "ng\.", "g\.\ssp.", "sp\.", "spp\.", "indeterminata", "undifferentiated", "ind\.", "ssp\.",
@@ -83,14 +98,17 @@ class Term:
     #chemistry_terminologies = None
     query_size_full = None
     query_size_shingle = None
-    #min_match = None
+    min_should_match = None
     min_sim_value=None
     ptn_bracket = None
     ptn_digit = None
+    prefix_length = 1
+    field_boost = None
+    min_length_frag = None
     elastic_shingle_tokenizer = "http://ws.pangaea.de/es/pangaea-terms/_analyze?analyzer=terms_folding&text="
 
     #def __init__(self, uservice,host,index,doctype,port,termi3,termi2,termi, size_full,size_shingle,minmatch, minsim):
-    def __init__(self, uservice, host, index, doctype, port, termi3, termi2, termi, size_full, size_shingle, minsim):
+    def __init__(self, uservice, host, index, doctype, port, termi3, termi2, termi, size_full, size_shingle, minsim, plength,minmatch, boost, fraglen):
         self.UCUM_SERVICE_QUANTITY = uservice
         self.elastic_host=host
         self.elastic_index = index
@@ -105,6 +123,10 @@ class Term:
         self.query_size_shingle = size_shingle
         #self.min_match = minmatch
         self.min_sim_value=minsim
+        self.prefix_length = plength
+        self.min_should_match=minmatch
+        self.field_boost=boost
+        self.min_length_frag = fraglen
 
         self.ptn_pang_replace_onqual = r'\b({})(?:\s|$)'.format('|'.join(self.pang_replace_onqual))
         self.pang_replace = self.pang_replace_onqual + self.pang_replace_general
@@ -226,7 +248,9 @@ class Term:
             if i.count('/') == 1:
                 new_list.extend(i.split('/'))
                 new_list.remove(i)
-        filtered_tokens = [s for s in new_list if s and len(s) > 1]  # filter out the blank entries
+        #18-02-2020 filter out very short fragemnts
+        #filtered_tokens = [s for s in new_list if s and len(s) > 1]  # filter out the blank entries
+        filtered_tokens = [s for s in new_list if s and len(s) > self.min_length_frag]
         return filtered_tokens
 
     def getUcumQuantity(self, uom):
@@ -262,16 +286,16 @@ class Term:
         #convert the first letter of fragment to lowercase if first word of the fragment contains only alphabets
 
         if (query_type == "fullmatch"):
-            q1 = Q({"multi_match": {"query": t, "fuzziness": 0, "fields":[ "name.fullmatch_exact^5", "name.fullmatch_folding" ]}})
+            q1 = Q({"multi_match": {"query": t, "fuzziness": 0, "fields":[ "name.fullmatch_exact^"+self.field_boost, "name.fullmatch_folding" ]}})
         elif (query_type == "fuzzy_fullmatch"):
-            q_a = Q({"multi_match": {"query": t, "fuzziness": 1, "prefix_length":1, "fields":[ "name.fullmatch_exact^5", "name.fullmatch_folding" ]}})
-            q_b = Q({"multi_match": {"query": t, "fuzziness": "AUTO", "prefix_length":1,"fields":[ "name.fullmatch_exact^5", "name.fullmatch_folding" ]}})
+            q_a = Q({"multi_match": {"query": t, "fuzziness": 1, "prefix_length":self.prefix_length, "fields":[ "name.fullmatch_exact^"+self.field_boost, "name.fullmatch_folding" ]}})
+            q_b = Q({"multi_match": {"query": t, "fuzziness": "AUTO", "prefix_length":self.prefix_length,"fields":[ "name.fullmatch_exact^"+self.field_boost, "name.fullmatch_folding" ]}})
             q1 = Q('bool', should=[q_a,q_b])
         else:
             size = self.query_size_shingle
             #if t.split()[0].isalpha():
                 #t = re.sub('([a-zA-Z])', lambda x: x.groups()[0].lower(), t, 1)
-            q1 = Q({"multi_match": {"query": t, "fuzziness": 0, "fields":[ "name.shinglematch_exact^5", "name.shinglematch_folding" ]}})
+            q1 = Q({"multi_match": {"query": t, "fuzziness": 0, "fields":[ "name.shinglematch_exact^"+self.field_boost, "name.shinglematch_folding" ]}})
 
         qFilter = Q('terms', terminology_id=self.tertiary_terminologies)
         if user_terminology is not None:
@@ -303,9 +327,12 @@ class Term:
             max_score = response['hits']['max_score']
             if list_res:
                 if query_type == "shinglematch":
-                    fragment_list = t.split()
+                    #18-02-2020 only takes resulting terms less than length_fragments+1
+                    #fragment_list = t.split()
                     #print('fragment_list',fragment_list)
                     t = t.lower()
+                    length_fragments = len(t.split())
+                    #print('length_fragments: ',length_fragments)
                     list_resval = [d['name'].lower() for d in list_res]
                     # list_resid = [d['id'] for d in list_res]
                     # remove names that are included in another word
@@ -316,8 +343,6 @@ class Term:
                     # options = list(set([d['name'].lower() for d in list_res]))
                     # print('options:',options)
                     # dict_grams = self.generateCombinations(list_res_low,len(fragment_list),max_score_names)
-                    length_fragments = len(fragment_list)
-                    #print('length_fragments: ',length_fragments)
                     dict_grams = self.generateCombinations(list_resval, length_fragments)
                     max_keys = self.get_max_cosine_sim(dict_grams.keys(), t,length_fragments)
                     # max_keys = self.fuzzy_process_extractBests(list(dict_grams.keys()), t)
@@ -331,20 +356,21 @@ class Term:
                     for m in max_keys:
                         value = dict_grams.get(m)
                         final_terms.extend(value)
-                    list_res = [d for d in list_res if d['name'].lower() in final_terms]
+                    return_val = [d for d in list_res if d['name'].lower() in final_terms]
+
                     #else:
                         #list_res = [d for d in list_res if d['score'] == max_score and len(d['name'].split())<=len(fragment_list)]
                         #print(list_res)
+                    #k = {x['name'].lower() for x in list_res}
+                    #for i in k:
+                        #sub_dict = [x for x in list_res if x['name'].lower() == i]
+                        #maxscore = max({d['score'] for d in sub_dict})
+                        #v = [d for d in sub_dict if d['score'] == maxscore]
+                        #return_val.extend(v)
                 else:
                     #TO-DO: return all five or just one
-                    list_res = [d for d in list_res if d['score'] == max_score]
-
-                k = {x['name'].lower() for x in list_res}
-                for i in k:
-                    sub_dict = [x for x in list_res if x['name'].lower() == i]
-                    maxscore = max({d['score'] for d in sub_dict})
-                    v = [d for d in sub_dict if d['score'] == maxscore]
-                    return_val.extend(v)
+                    #print(list_res)
+                    return_val = [d for d in list_res if d['score'] == max_score]
                 #remove redundant terms - only include highest scored terms
                 # list_names = [d['name'] for d in list_res] #dont chnage to set
                 # duplicates = {item for item, count in collections.Counter(map(str.lower, list_names)).items() if count > 1}
@@ -365,20 +391,18 @@ class Term:
     #def generateCombinations(self,options,len_fragment, max_terms):
     def generateCombinations(self, options, len_fragment):
         dict_grams = {}
-        #print('options',options)
-        #for i in range(1, len(options) + 1):
         for i in range(1, len_fragment+1):
-            for subset in itertools.combinations(options, i): #return i-length tuples in sorted order with no repeated elements.
+            #It return r-length tuples in sorted order with no repeated elements. For Example, combinations(‘ABCD’, 2) ==> [AB, AC, AD, BC, BD, CD].
+            for subset in itertools.combinations(options, i):
                 combined = ' '.join(subset) # e.g, subset -> ('carbon', 'magnetic flux')
                 #a longer string can never be a substring of a shorter/equal length string
-                if (len(combined.split()) <= len_fragment+1):
+                if (len(combined.split()) <= len_fragment+1): #allow buffer word
                     set_subset = set(subset)
                 #if max_terms.intersection(set_subset):
                 #if (len(combined.split()) <= len_fragment) and (len(max_terms.intersection(set_subset)) > 0):
                     dict_grams[combined] = set_subset # e.g., surface water temperature ('surface water', 'temperature')
                     # or surface water water ('surface water', 'water')
         #print(len(dict_grams))
-        #print(dict_grams)
         return dict_grams
 
     # def preprocess_terms(self, text):
@@ -455,35 +479,34 @@ class Term:
     # similarity measure between two strings from the angular divergence within term based vector space.
     def get_max_cosine_sim(self, choices, query,length_fragments):
         similarities = {}
-        final_matches = set()
         #query_vec = self.cosine_preprocess_elastic_to_vector(query)
         query_vec = self.process_and_vectorize(query)
         #print(query_vec)
         #len_query = len(query.split())
         #threshold_sim = (len_query-1)/len_query
 
-        if length_fragments <=3:
-            threshold_sim= 0.5
-        else:
-            threshold_sim = self.min_sim_value
+        #comment out by asd 18-02-2020
+        #if length_fragments <=3:
+            #threshold_sim= 0.5
+        #else:
+        threshold_sim = self.min_sim_value
+        #print(threshold_sim)
         for c in choices:
-            #sim = self.get_cosine(query_vec, self.cosine_preprocess_elastic_to_vector(c))
             sim = self.get_cosine(query_vec, self.process_and_vectorize(c))
             #print(sim, c)
-            #if sim >= self.min_sim_value:
             if sim >= threshold_sim:
                 similarities[c] = sim
-        #sorted_x = sorted(similarities.items(), key=operator.itemgetter(1),reverse=True)
-        #thresholds = {key: value for key, value in similarities.items() if value >= self.min_sim_value}
-
-        if similarities:
-            max_sim = max(similarities.values())
-        #if max_sim >= self.min_sim_value:
-        # getting all keys containing the `maximum`
-            final_matches = [k for k, v in similarities.items() if v == max_sim]
+        #-old sorted_x = sorted(similarities.items(), key=operator.itemgetter(1),reverse=True)
+        #thresholds-old  = {key: value for key, value in similarities.items() if value >= self.min_sim_value}
+        # comment out by asd 18-02-2020
+        #if similarities:
+            #max_sim = max(similarities.values())
+            #final_matches = [k for k, v in similarities.items() if v == max_sim]
         # else:
         #     final_matches_temp = {k for k, v in similarities.items() if v >= 0.5}
         #     final_matches = {k for k, v in final_matches_temp.items() if v == max(final_matches_temp.values())}
+        #return final_matches
+        final_matches = {k for k, v in similarities.items()}
         return final_matches
 
     def remove_stopwords(self,words):

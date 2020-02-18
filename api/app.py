@@ -205,20 +205,23 @@ if __name__ == '__main__':
     port = int(config['INPUT']['service_port'])
     host = config['INPUT']['service_host']
     topic_mapping_file = path1 + "/"+config['INPUT']['topic_terminology_mapping_file']
+    prefix_length = int(config['INPUT']['fuzzy_prefix_length'])
 
     dftopic = pd.read_excel(topic_mapping_file, sheet_name=0,
                         index_col=None, na_values=['NA'], usecols="A,C",
                         header=0, converters={'TopicId': int, 'TerminologyId': int})
     dftopic = dftopic[dftopic.TerminologyId.notnull()]
 
-    #min_match = config['INPUT']['min_match_percent']+"%"
+    min_should_match = config['INPUT']['min_should_match']+"%"
     min_sim_value = float(config['INPUT']['min_sim_value'])
+    factor = config.get("INPUT", "match_factor")
+    min_length_frag = int(config['INPUT']['min_frag_length'])
     #logging.info('Ucum Service :%s', ucum_service)
     #termInstance = term.Term(ucum_service,elastic_host,elastic_index,elastic_doctype,elastic_port,tertiary_terminologies,
                              #secondary_terminologies,primary_terminologies,query_size_full,query_size_shingle,min_match,min_sim_value)
     termInstance = term.Term(ucum_service, elastic_host, elastic_index, elastic_doctype, elastic_port,
                              tertiary_terminologies,
-                             secondary_terminologies, primary_terminologies, query_size_full, query_size_shingle, min_sim_value)
+                             secondary_terminologies, primary_terminologies, query_size_full, query_size_shingle, min_sim_value, prefix_length,min_should_match, factor,min_length_frag)
 
     #app.run(debug=True)
     server = WSGIServer((host, port), app,log = None)
