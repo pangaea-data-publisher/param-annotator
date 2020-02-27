@@ -302,9 +302,10 @@ class Term:
             qShould1 = Q('constant_score', filter=Q('terms', terminology_id=user_terminology), boost=10)
             q = Q('bool', must=[q1], should=[qShould1], filter=[qFilter])
         else:
+            qShould_q = Q('constant_score', filter=Q('term', terminology_id=13), boost=10) #added 21-02-2020 boost by quantity
             qShould1 = Q('constant_score', filter=Q('terms',terminology_id=self.primary_terminology), boost=10)
             qShould2 = Q('constant_score', filter=Q('terms', terminology_id=self.secondary_terminologies), boost=5)
-            q = Q('bool', must=[q1],should=[qShould1,qShould2], filter =[qFilter])
+            q = Q('bool', must=[q1],should=[qShould_q,qShould1,qShould2], filter =[qFilter])
         s = Search(using=self.elasticSearchInst, index=self.elastic_index, doc_type=self.elastic_doctype).query(q)
         #s = s.filter("terms", terminology_id=self.all_terminologies)
         s = s.extra(size=size)
@@ -327,10 +328,7 @@ class Term:
             max_score = response['hits']['max_score']
             if list_res:
                 if query_type == "shinglematch":
-                    #18-02-2020 only takes resulting terms less than length_fragments+1
-                    #fragment_list = t.split()
-                    #print('fragment_list',fragment_list)
-                    t = t.lower()
+                    t = t.lower() # lowercase fragment
                     length_fragments = len(t.split())
                     #print('length_fragments: ',length_fragments)
                     list_resval = [d['name'].lower() for d in list_res]
@@ -344,7 +342,10 @@ class Term:
                     # print('options:',options)
                     # dict_grams = self.generateCombinations(list_res_low,len(fragment_list),max_score_names)
                     dict_grams = self.generateCombinations(list_resval, length_fragments)
+
+                    print('------------')
                     max_keys = self.get_max_cosine_sim(dict_grams.keys(), t,length_fragments)
+
                     # max_keys = self.fuzzy_process_extractBests(list(dict_grams.keys()), t)
                     # Attempts to account for partial string matches better. Calls ratio using the shortest
                     # string (length n) against all n-length substrings of the larger string and returns the highest score
@@ -388,12 +389,13 @@ class Term:
         return set(i for i in string_list
                if not any(i in s for s in string_list if i != s))
 
-    #def generateCombinations(self,options,len_fragment, max_terms):
     def generateCombinations(self, options, len_fragment):
         dict_grams = {}
+
         for i in range(1, len_fragment+1):
-            #It return r-length tuples in sorted order with no repeated elements. For Example, combinations(‘ABCD’, 2) ==> [AB, AC, AD, BC, BD, CD].
+            #It returns r-length tuples in sorted order with no repeated elements. For Example, combinations(‘ABCD’, 2) ==> [AB, AC, AD, BC, BD, CD].
             for subset in itertools.combinations(options, i):
+                print(subset)
                 combined = ' '.join(subset) # e.g, subset -> ('carbon', 'magnetic flux')
                 #a longer string can never be a substring of a shorter/equal length string
                 if (len(combined.split()) <= len_fragment+1): #allow buffer word

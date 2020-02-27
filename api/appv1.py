@@ -116,8 +116,8 @@ def getTerm():
                 match_type = 'fuzzy'
             if not idscore_dict and shingle_active=="true":
                 # shingle match
-                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'shinglematch')
                 match_type = 'shingle'
+                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'shinglematch')
 
             results_dict = {}
             if f in paramName:
@@ -131,10 +131,10 @@ def getTerm():
             results_dict['fragment'] = f
             results_dict['start_offset'] = startIndex
             results_dict['end_offset'] = endIndex
-            if idscore_dict:
-                results_dict['match_type'] = match_type
-            else:
-                results_dict['match_type'] = None
+            #if idscore_dict: comment out on 27-02-2020
+            results_dict['match_type'] = match_type
+            #else:
+                #results_dict['match_type'] = None
             #results_dict['term'] = idscore_dict
             # sort terms dict by score
             results_dict['term'] = sorted(idscore_dict, key=lambda i: i['score'], reverse=True)

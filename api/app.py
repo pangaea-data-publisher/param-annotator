@@ -1,7 +1,5 @@
-import gevent.monkey
-gevent.monkey.patch_all()
-#from requests.packages.urllib3.util.ssl_ import create_urllib3_context
-#create_urllib3_context()
+#import gevent.monkey
+#gevent.monkey.patch_all()
 from flask import request
 import json
 import logging
@@ -9,7 +7,7 @@ import term
 import configparser as ConfigParser
 import os
 import re
-from gevent.pywsgi import WSGIServer
+#from gevent.pywsgi import WSGIServer
 from flask import Flask
 #from flask.logging import default_handler
 import pandas as pd
@@ -27,9 +25,13 @@ app = Flask(__name__)
 termInstance = None
 dftopic = None
 
+@app.route('/')
+def hello():
+    return "Hello World!"
+
 @app.route('/param-annotator')
 def home():
-    return "Hello, World!"
+    return "Hello param-annotator!"
 
 @app.route('/param-annotator/api', methods=['GET'])
 def getTerm():
@@ -109,7 +111,7 @@ def getTerm():
     #logging.info("Param Fragments: {}".format(' '.join(str(e.encode('utf-8')) for (e) in list_fragments)))
     logging.debug(u"Param Fragments: %s" % [g.encode('ascii', 'ignore') for g in list_fragments])
 
-    #print('list_fragments ',list_fragments)
+    print('list_fragments ',list_fragments)
     if list_fragments:
         for f in list_fragments:
             startIndex = None
@@ -128,7 +130,8 @@ def getTerm():
             if not idscore_dict:
                 # shingle match
                 #idscore_dict = termInstance.executeTermQuery(f, True, False,user_terminolgy,'shinglematch')
-                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'shinglematch')
+                #comment out 22-02-2020
+                #idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'shinglematch')
                 match_type = 'shingle'
 
             results_dict = {}
@@ -163,12 +166,10 @@ def getTerm():
         response = app.response_class(status=404)
     return response
 
-
-
 # If we're running in stand alone mode, run the application
 if __name__ == '__main__':
-    import gevent.monkey
-    gevent.monkey.patch_all()
+    #import gevent.monkey # comment out 22-02-2020
+    #gevent.monkey.patch_all() #  # comment out 22-02-2020
 
     logging.basicConfig(level=logging.INFO, filename='param-annotator.log', filemode="a+",
                         format="%(asctime)s %(levelname)s %(message)s")
@@ -223,9 +224,9 @@ if __name__ == '__main__':
                              tertiary_terminologies,
                              secondary_terminologies, primary_terminologies, query_size_full, query_size_shingle, min_sim_value, prefix_length,min_should_match, factor,min_length_frag)
 
-    #app.run(debug=True)
-    server = WSGIServer((host, port), app,log = None)
-    server.serve_forever()
+    app.run(host='0.0.0.0', port=8383) #added 22-02-2020
+    #server = WSGIServer((host, port), app,log = None)
+    #server.serve_forever()
 
 def rchop(thestring, ending):
   if thestring.endswith(ending):
