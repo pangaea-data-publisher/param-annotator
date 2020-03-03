@@ -263,8 +263,10 @@ class Term:
             if list_res:
                 if query_type == "shinglematch":
                     fragment_vector = self.tokenize_string(t) #Counter({'temperature': 1, 'sea': 1, 'surface': 1})
+                    #print('fragment_vector ',fragment_vector)
                     list_ids = [str(d['id']) for d in list_res]
                     tokenized_terms_dict = self.tokenize_by_ids(list_ids)
+                    #print(tokenized_terms_dict)
                     list_ids_tuples = self.generateCombinationsByTermIds(list_ids, len(t.split()))
                     final_ids = self.compute_cosine_sim(tokenized_terms_dict, list_ids_tuples, fragment_vector)
                     final_ids = [int(i) for i in final_ids]
