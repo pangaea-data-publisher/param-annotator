@@ -99,7 +99,6 @@ def getTerm():
     #logging.info("Param Fragments: " ,list_fragments)
     #logging.info("Param Fragments: {}".format(' '.join(str(e.encode('utf-8')) for (e) in list_fragments)))
     logging.debug(u"Param Fragments: %s" % [g.encode('ascii', 'ignore') for g in list_fragments])
-
     #print('list_fragments ',list_fragments)
     if list_fragments:
         for f in list_fragments:
@@ -166,22 +165,23 @@ if __name__ == '__main__':
     elastic_index = config['INPUT']['elastic_index']
     elastic_doctype = config['INPUT']['elastic_doctype']
     elastic_port = int(config['INPUT']['elastic_port'])
-    tertiary_terminologies = config.get("INPUT", "tertiary_terminologies")
-    tertiary_terminologies = [int(x) for x in tertiary_terminologies.split(",")]
-    secondary_terminologies = config.get("INPUT", "secondary_terminologies")
-    secondary_terminologies = [int(x) for x in secondary_terminologies.split(",")]
-    primary_terminologies = config.get("INPUT", "primary_terminology")
-    primary_terminologies = [int(x) for x in primary_terminologies.split(",")]
+    #primary_terminologies = config.get("INPUT", "primary_terminology")
+    #primary_terminologies = [int(x) for x in primary_terminologies.split(",")]
     query_size_full = int(config['INPUT']['query_size_full'])
     query_size_shingle = int(config['INPUT']['query_size_shingle'])
+    query_size_shingle_return = int(config['INPUT']['query_size_shingle_return'])
     port = int(config['INPUT']['service_port'])
     host = config['INPUT']['service_host']
     topic_mapping_file = path1 + "/"+config['INPUT']['topic_terminology_mapping_file']
     prefix_length = int(config['INPUT']['fuzzy_prefix_length'])
     param_annotator_port = int(config['INPUT']['param_annotator_port'])
-    priterminology_boost = int(config['INPUT']['primary_terminology_boost'])
-    secterminology_boost = int(config['INPUT']['secondary_terminology_boost'])
-    quanterminology_boost = int(config['INPUT']['quantity_terminology_boost'])
+
+    # added 05-03-2020 for dynamic assignment of terminolgies and their boost values
+    terminologies_boost_temp = dict(config['TERMINOLOGY'])
+    terminologies_boost_dict={}
+    for key, value in terminologies_boost_temp.items():
+        terminologies_boost_dict[int(key.split('_')[1])]=int(value)
+
     dftopic = pd.read_excel(topic_mapping_file, sheet_name=0,
                         index_col=None, na_values=['NA'], usecols="A,C",
                         header=0, converters={'TopicId': int, 'TerminologyId': int})
@@ -193,11 +193,9 @@ if __name__ == '__main__':
     min_length_frag = int(config['INPUT']['min_frag_length'])
     elastic_tokenizer_ids = config['INPUT']['elastic_tokenizer_ids']
     elastic_tokenizer_str = config['INPUT']['elastic_tokenizer_str']
-    termInstance = termv1.Term(ucum_service, elastic_host, elastic_index, elastic_doctype, elastic_port,
-                             tertiary_terminologies,
-                             secondary_terminologies, primary_terminologies, query_size_full, query_size_shingle, min_sim_value, prefix_length,
-                               min_should_match, match_field_boost,min_length_frag,quanterminology_boost,
-                               priterminology_boost,secterminology_boost,elastic_tokenizer_ids,elastic_tokenizer_str)
+    termInstance = termv1.Term(ucum_service, elastic_host, elastic_index, elastic_doctype, elastic_port, query_size_full,
+                               query_size_shingle, query_size_shingle_return,min_sim_value, prefix_length,
+                               min_should_match, match_field_boost,min_length_frag,elastic_tokenizer_ids,elastic_tokenizer_str,terminologies_boost_dict)#
 
     app.run(host='0.0.0.0', port=param_annotator_port) #added 22-02-2020
 

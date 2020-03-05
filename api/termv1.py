@@ -67,9 +67,6 @@ class Term:
     elastic_doctype=None
     elastic_port=None
     elasticSearchInst = None
-    primary_terminology = None
-    secondary_terminologies = None
-    tertiary_terminologies=None
     elastic_min_should_match=None
     query_size_full = None
     query_size_shingle = None
@@ -79,36 +76,30 @@ class Term:
     prefix_length = 1
     field_boost = None
     min_length_frag = None
-    primary_terminology_boost = None
-    second_terminology_boost = None
-    quantity_terminology_boost = None
     elasticurl_tokenizer_ids = None
     elasticurl_tokenizer_str = None
+    terminologies_dict=None
+    size_shingle_return=None
 
-    #def __init__(self, uservice,host,index,doctype,port,termi3,termi2,termi, size_full,size_shingle,minmatch, minsim):
-    def __init__(self, uservice, host, index, doctype, port, termi3, termi2, termi, size_full, size_shingle, minsim, plength,
-                 minmatch, boost, fraglen, quanboost,priboost,secboost, elastokenids, elastokenstr):
+    def __init__(self, uservice, host, index, doctype, port, size_full, size_shingle, size_shingle_rtn, minsim, plength,
+                 minmatch, boost, fraglen, elastokenids, elastokenstr,termsdict):
         self.UCUM_SERVICE_QUANTITY = uservice
         self.elastic_host=host
         self.elastic_index = index
         self.elastic_doctype = doctype
         self.elastic_port = port
         self.initElasticSearch()
-        self.primary_terminology = termi
-        self.secondary_terminologies=termi2
-        self.tertiary_terminologies=termi3
         self.query_size_full = size_full
         self.query_size_shingle = size_shingle
+        self.size_shingle_return = size_shingle_rtn
         self.elastic_min_should_match = minmatch
         self.min_sim_value=minsim
         self.prefix_length = plength
         self.field_boost=boost
         self.min_length_frag = fraglen
-        self.quantity_terminology_boost= quanboost
-        self.primary_terminology_boost = priboost
-        self.second_terminology_boost = secboost
         self.elasticurl_tokenizer_ids= elastokenids
         self.elasticurl_tokenizer_str = elastokenstr
+        self.terminologies_dict=termsdict
 
         self.ptn_pang_replace_onqual = r'\b({})(?:\s|$)'.format('|'.join(self.pang_replace_onqual))
         self.pang_replace = self.pang_replace_onqual + self.pang_replace_general
@@ -201,12 +192,13 @@ class Term:
             #no need to do url encode of units
             q = self.UCUM_SERVICE_QUANTITY + urllib.parse.quote(uom)
             resp = requests.get(q)
+            json_data = json.loads(resp.text)
             #encode to bytes, and then decode to text.
-            json_data= json.loads(resp.text.encode('raw_unicode_escape').decode('utf8'))
+            #json_data= json.loads(resp.text.encode('raw_unicode_escape').decode('utf8'))
             if (resp.status_code == requests.codes.ok):
                 status = json_data['status']
                 if (status == '201_QUANTITY_FOUND'):
-                    ucum_dict['unit'] = json_data['input']
+                    ucum_dict['unit'] = uom
                     ucum_dict['ucum'] = json_data['ucum']
                     ucum_dict['fullname'] = json_data['fullname']
                     ucum_dict['quantity'] = json_data['qudt_quantity']
@@ -232,20 +224,24 @@ class Term:
             size = self.query_size_shingle
             q1 = Q({"multi_match": {"query": t, "fuzziness": 0, "fields":[ "name.shinglematch_exact^"+self.field_boost, "name.shinglematch_folding" ]}})
 
-        qFilter = Q('terms', terminology_id=self.tertiary_terminologies)
+        qFilter = Q('terms', terminology_id=list(self.terminologies_dict.keys()))
+        shoud_clause=[]
         if user_terminology is not None:
-            qShould1 = Q('constant_score', filter=Q('terms', terminology_id=user_terminology), boost=10)
+            # limit results to terminologies related to specific domain(s)
+            qShould1 = Q('constant_score', filter=Q('terms', terminology_id=user_terminology), boost=20)
             q = Q('bool', must=[q1], should=[qShould1], filter=[qFilter])
         else:
-            qShould_q = Q('constant_score', filter=Q('term', terminology_id=13), boost=self.quantity_terminology_boost) #added 21-02-2020 boost by quantity
-            qShould1 = Q('constant_score', filter=Q('terms',terminology_id=self.primary_terminology), boost=self.primary_terminology_boost)
-            qShould2 = Q('constant_score', filter=Q('terms', terminology_id=self.secondary_terminologies), boost=self.second_terminology_boost)
-            q = Q('bool', must=[q1],should=[qShould_q,qShould1,qShould2], filter =[qFilter])
+            for k,v in self.terminologies_dict.items():
+                shoud_clause.append(Q('constant_score', filter=Q('term', terminology_id=k),boost=v))
+            #qShould_q = Q('constant_score', filter=Q('term', terminology_id=13), boost=self.quantity_terminology_boost) #added 21-02-2020 boost by quantity
+            #qShould1 = Q('constant_score', filter=Q('terms',terminology_id=self.primary_terminology), boost=self.primary_terminology_boost)
+            #qShould2 = Q('constant_score', filter=Q('terms', terminology_id=self.secondary_terminologies), boost=self.second_terminology_boost)
+            q = Q('bool', must=[q1],should=shoud_clause, filter =[qFilter])
+        #print(q.to_dict())
         s = Search(using=self.elasticSearchInst, index=self.elastic_index, doc_type=self.elastic_doctype).query(q)
-        #s = s.filter("terms", terminology_id=self.all_terminologies)
         s = s.extra(size=size)
+
         response = s.execute()
-        #print(response.success())
         list_res = []
         return_val = []
         if response:
@@ -262,6 +258,7 @@ class Term:
 
             if list_res:
                 if query_type == "shinglematch":
+                    #2020-03-05 do not apply max score filter for shingle match
                     fragment_vector = self.tokenize_string(t) #Counter({'temperature': 1, 'sea': 1, 'surface': 1})
                     #print('fragment_vector ',fragment_vector)
                     list_ids = [str(d['id']) for d in list_res]
@@ -269,7 +266,6 @@ class Term:
                     #print(tokenized_terms_dict)
                     list_ids_tuples = self.generateCombinationsByTermIds(list_ids, len(t.split()))
                     final_ids = self.compute_cosine_sim(tokenized_terms_dict, list_ids_tuples, fragment_vector)
-                    final_ids = [int(i) for i in final_ids]
                     #remove the records not in final_ids
                     return_val = [d for d in list_res if d['id'] in final_ids]
                 else:
@@ -336,22 +332,24 @@ class Term:
         if not denominator:
             return 0.0
         else:
-            return float(numerator) / denominator
+            return round(float(numerator / denominator),1)
 
     def compute_cosine_sim(self, tokenized_dict, list_tuples, query_vec):
-        #similarities = {}
         final_matches=set()
+        #temp={}
         for tuple in list_tuples:
             text =[]
             for t in tuple:
                 text.extend(tokenized_dict.get(t))
-            sim = self.get_cosine(query_vec, Counter(set(text)))
+            sim = self.get_cosine(query_vec, Counter(text))
             #print(sim, text)
             if sim >= self.min_sim_value:
                 #similarities[tuple] = sim
-                final_matches.add(tuple)
-        #final_matches = {k for k, v in similarities.items()}
-        return set(sum(final_matches, ())) # transform a list of tuples into a flat list
+                final_matches= final_matches.union(tuple)
+                #temp[sim]=tuple
+        #print(temp)
+        #return final_matches
+        return list(map(int, final_matches))
 
     def fuzzy_process_extractBests(self, choices, query):
         query_vec = self.process_and_vectorize_string(query)
