@@ -5,3 +5,4 @@ fuzzywuzzy
 pandas
 flask
 elasticsearch-dsl
+stop_words
