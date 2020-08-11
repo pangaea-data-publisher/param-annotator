@@ -11,3 +11,9 @@ pip install -r requirements.txt
 python api/appv1.py
 ```
 
+Stopwords from nltk should be download prior to running the service
+```
+import nltk
+nltk.download('stopwords')
+```
+
