@@ -1,28 +1,27 @@
-import requests
-import urllib.parse
+import itertools
 import json
-from unidecode import unidecode
+import logging
+import re
+import string
+import urllib.parse
+from difflib import SequenceMatcher
+from operator import itemgetter
+import nltk.stem.snowball
+import requests
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search, Q
 from nltk.tokenize import RegexpTokenizer
-import re, unicodedata
-import logging
-from operator import itemgetter
-from difflib import SequenceMatcher
-from nltk.util import ngrams
-import itertools
-import string
-import nltk.stem.snowball
-logging.getLogger("Elasticsearch").setLevel(logging.WARNING)
-logging.getLogger("elasticsearch").setLevel(logging.WARNING)
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from collections import Counter
 import math
 from nltk.corpus import stopwords
 from stop_words import get_stop_words
-from nltk.stem import WordNetLemmatizer
 from nltk.stem.snowball import SnowballStemmer
+
+logging.getLogger("Elasticsearch").setLevel(logging.WARNING)
+logging.getLogger("elasticsearch").setLevel(logging.WARNING)
+
 class Term:
     global stemmer,tokenizer
     stemmer = SnowballStemmer("english")

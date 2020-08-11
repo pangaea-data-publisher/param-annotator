@@ -1,0 +1,7 @@
+elasticsearch
+requests
+nltk
+fuzzywuzzy
+pandas
+flask
+elasticsearch-dsl
