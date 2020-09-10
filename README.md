@@ -11,9 +11,9 @@ pip install -r requirements.txt
 python api/appv1.py
 ```
 
-To get semantic terms associated with a parameter (unit is optional).
+To get semantic terms associated with a parameter ('unit' is optional).
 ```
-http://localhost:8383/param-annotator/api?name={parameter name}&unit={units of measurements}
+http://localhost:8383/param-annotator/api?name={parameter_name}&unit={units_of_measurements}
 ```
 
 Stopwords from nltk should be download prior to running the service
