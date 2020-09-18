@@ -172,7 +172,7 @@ if __name__ == '__main__':
     query_size_shingle_return = int(config['INPUT']['query_size_shingle_return'])
     topic_mapping_file = path1 + "/"+config['INPUT']['topic_terminology_mapping_file']
     prefix_length = int(config['INPUT']['fuzzy_prefix_length'])
-    param_annotator_host = int(config['INPUT']['service_host'])
+    param_annotator_host = config['INPUT']['service_host']
     param_annotator_port = int(config['INPUT']['service_port'])
 
     # added 05-03-2020 for dynamic assignment of terminolgies and their boost values
