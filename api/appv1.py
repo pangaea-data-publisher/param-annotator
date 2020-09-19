@@ -14,13 +14,9 @@ app = Flask(__name__)
 termInstance = None
 dftopic = None
 
-@app.route('/')
-def hello():
-    return "Hello World!"
-
-@app.route('/param-annotator')
+@app.route('/param-annotator/')
 def home():
-    return "Hello param-annotator!"
+    return "Hello here's param-annotator! Please use me with the /api endpoint, e.g.: /param-annotator/api?name=Carbon,%20concentration&unit=mmol/l"
 
 @app.route('/param-annotator/api', methods=['GET'])
 def getTerm():
