@@ -153,10 +153,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, filename='param-annotator.log', filemode="a+",
                         format="%(asctime)s %(levelname)s %(message)s")
     #root = logging.getLogger()
-    #config = ConfigParser.ConfigParser()
     path1 = os.path.abspath(os.path.join(os.path.dirname(__file__),".."))
-    #configFile = args.config
-    #config.read(path1+"/config/termconf.ini")
     ap = argparse.ArgumentParser()
     ap.add_argument("-c", "--config", required=True, help="Path to termconf.ini config file")
     args = ap.parse_args()
