@@ -61,10 +61,9 @@ class Term:
     UCUM_SERVICE_QUANTITY = None
     ptn_pang_replace = None
     ptn_splitword_all=None
-    elastic_host=None
+    elastic_url=None
     elastic_index=None
     elastic_doctype=None
-    elastic_port=None
     elasticSearchInst = None
     elastic_min_should_match=None
     query_size_full = None
@@ -80,13 +79,12 @@ class Term:
     terminologies_dict=None
     size_shingle_return=None
 
-    def __init__(self, uservice, host, index, doctype, port, size_full, size_shingle, size_shingle_rtn, minsim, plength,
-                 minmatch, boost, fraglen, elastokenids, elastokenstr,termsdict):
+    def __init__(self, uservice, esurl, index, doctype, size_full, size_shingle, size_shingle_rtn, minsim, plength,
+                 minmatch, boost, fraglen, termsdict):
         self.UCUM_SERVICE_QUANTITY = uservice
-        self.elastic_host=host
+        self.elastic_url = esurl
         self.elastic_index = index
         self.elastic_doctype = doctype
-        self.elastic_port = port
         self.initElasticSearch()
         self.query_size_full = size_full
         self.query_size_shingle = size_shingle
@@ -96,8 +94,8 @@ class Term:
         self.prefix_length = plength
         self.field_boost=boost
         self.min_length_frag = fraglen
-        self.elasticurl_tokenizer_ids= elastokenids
-        self.elasticurl_tokenizer_str = elastokenstr
+        self.elasticurl_tokenizer_ids= "%s/%s/_mtermvectors" % (self.elastic_url, urllib.parse.quote(self.elastic_index))
+        self.elasticurl_tokenizer_str = "%s/%s/_analyze?field=name.tokenmatch_folding&text=" % (self.elastic_url, urllib.parse.quote(self.elastic_index))
         self.terminologies_dict=termsdict
 
         self.ptn_pang_replace_onqual = r'\b({})(?:\s|$)'.format('|'.join(self.pang_replace_onqual))
@@ -124,7 +122,7 @@ class Term:
         if not self.elasticSearchInst:
             logging.info('Initializing elastic search term index...')
             try:
-                self.elasticSearchInst = Elasticsearch([self.elastic_host], port=self.elastic_port)
+                self.elasticSearchInst = Elasticsearch([self.elastic_url])
                 logging.debug("Elasticsearch is connected", self.elasticSearchInst.info())
             except Exception as ex:
                 logging.debug("Error initElasticSearch:", ex)
@@ -294,7 +292,7 @@ class Term:
         return l
 
     def tokenize_string(self,text):
-        q = self.elasticurl_tokenizer_str + text
+        q = self.elasticurl_tokenizer_str + urllib.parse.quote(text)
         resp = requests.get(q)
         data = json.loads(resp.text)
         words = None

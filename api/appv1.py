@@ -164,10 +164,9 @@ if __name__ == '__main__':
     config.read(args.config)
 
     ucum_service = config['INPUT']['ucum_service']
-    elastic_host = config['INPUT']['elastic_host']
+    elastic_url = config['INPUT']['elastic_url']
     elastic_index = config['INPUT']['elastic_index']
     elastic_doctype = config['INPUT']['elastic_doctype']
-    elastic_port = int(config['INPUT']['elastic_port'])
     #primary_terminologies = config.get("INPUT", "primary_terminology")
     #primary_terminologies = [int(x) for x in primary_terminologies.split(",")]
     query_size_full = int(config['INPUT']['query_size_full'])
@@ -193,11 +192,9 @@ if __name__ == '__main__':
     min_sim_value = float(config['INPUT']['min_sim_value'])
     match_field_boost = config.get("INPUT", "match_field_boost")
     min_length_frag = int(config['INPUT']['min_frag_length'])
-    elastic_tokenizer_ids = config['INPUT']['elastic_tokenizer_ids']
-    elastic_tokenizer_str = config['INPUT']['elastic_tokenizer_str']
-    termInstance = termv1.Term(ucum_service, elastic_host, elastic_index, elastic_doctype, elastic_port, query_size_full,
+    termInstance = termv1.Term(ucum_service, elastic_url, elastic_index, elastic_doctype, query_size_full,
                                query_size_shingle, query_size_shingle_return,min_sim_value, prefix_length,
-                               min_should_match, match_field_boost,min_length_frag,elastic_tokenizer_ids,elastic_tokenizer_str,terminologies_boost_dict)#
+                               min_should_match, match_field_boost,min_length_frag,terminologies_boost_dict)#
 
     app.run(host=param_annotator_host, port=param_annotator_port)
 
