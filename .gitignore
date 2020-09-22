@@ -2,3 +2,4 @@ test/
 .idea/
 api/__pycache__/
 param-annotator.log
+config/termconf_local.ini

@@ -7,6 +7,8 @@ import os
 import re
 from flask import Flask
 import pandas as pd
+import configparser
+import argparse
 
 # Create the application instance
 app = Flask(__name__)
@@ -151,11 +153,16 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, filename='param-annotator.log', filemode="a+",
                         format="%(asctime)s %(levelname)s %(message)s")
     #root = logging.getLogger()
-
-    config = ConfigParser.ConfigParser()
+    #config = ConfigParser.ConfigParser()
     path1 = os.path.abspath(os.path.join(os.path.dirname(__file__),".."))
     #configFile = args.config
-    config.read(path1+"/config/termconf.ini")
+    #config.read(path1+"/config/termconf.ini")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-c", "--config", required=True, help="Path to termconf.ini config file")
+    args = ap.parse_args()
+    config = configparser.ConfigParser()
+    config.read(args.config)
+
     ucum_service = config['INPUT']['ucum_service']
     elastic_host = config['INPUT']['elastic_host']
     elastic_index = config['INPUT']['elastic_index']
