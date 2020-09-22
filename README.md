@@ -15,7 +15,7 @@ python3 -m nltk.downloader stopwords
 To run the service (default port 8383), please execute the following from the root directory:
 
 ```
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 python3 api/appv1.py
 ```
 
