@@ -3,6 +3,7 @@ import json
 import logging
 import termv1
 import configparser as ConfigParser
+import operator
 import os
 import re
 from flask import Flask
@@ -138,6 +139,7 @@ def getTerm():
             term_jsn.append(results_dict)
 
     if ucum_jsn or term_jsn:
+        term_jsn.sort(key=operator.itemgetter('start_offset'))
         results['dim_match'] = ucum_jsn
         results['text_match'] = term_jsn
         response = app.response_class(
