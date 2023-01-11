@@ -23,3 +23,4 @@ To get semantic terms associated with a parameter ('unit' is optional).
 ```
 http://localhost:8383/param-annotator/api?name={parameter_name}&unit={units_of_measurements}
 ```
+.
