@@ -22,6 +22,7 @@ def home():
     return "Hello here's param-annotator! Please use me with the /api endpoint, e.g.: /param-annotator/api?name=Carbon,%20concentration&unit=mmol/l"
 
 @app.route('/param-annotator/api', methods=['GET'])
+
 def getTerm():
     unit=None
     paramName=None
@@ -50,7 +51,6 @@ def getTerm():
     results['parameter'] =paramName
     ucum_jsn ={}
     term_jsn =[]
-
     # infer units
     if unit:
         ucum_jsn = termInstance.getUcumQuantity(unit)
@@ -97,17 +97,26 @@ def getTerm():
     list_fragments = termInstance.extractParamFragment(paramName)
     #logging.info("Param Fragments: " ,list_fragments)
     #logging.info("Param Fragments: {}".format(' '.join(str(e.encode('utf-8')) for (e) in list_fragments)))
-    logging.debug(u"Param Fragments: %s" % [g.encode('ascii', 'ignore') for g in list_fragments])
+    logging.debug(u"Param Fragments: %s" % [g['token'].encode('ascii', 'ignore') for g in list_fragments])
     #print('list_fragments ',list_fragments)
     if list_fragments:
-        for f in list_fragments:
+        for fr in list_fragments:
+            f = fr.get('token')
+            tt = fr.get('type')
             startIndex = None
             endIndex = None
             match_type = None
             idscore_dict = None
             # full match w/o fuzzy
-            idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'fullmatch')
-            match_type = 'full'
+            if tt == 'taxon':
+                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'taxon_fullmatch')
+                match_type = 'full'
+            elif tt == 'quality':
+                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'quality_fullmatch')
+                match_type = 'full'
+            else:
+                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'fullmatch')
+                match_type = 'full'
             if not idscore_dict:
                 # full match with fuzzy
                 idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'fuzzy_fullmatch')
@@ -116,8 +125,8 @@ def getTerm():
                 # shingle match
                 match_type = 'shingle'
                 idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'shinglematch')
-
             results_dict = {}
+
             if f in paramName:
                 startIndex = paramName.index(f)
                 endIndex = startIndex + len(f)
@@ -130,12 +139,18 @@ def getTerm():
             results_dict['start_offset'] = startIndex
             results_dict['end_offset'] = endIndex
             #if idscore_dict: comment out on 27-02-2020
+
             results_dict['match_type'] = match_type
+            results_dict['guessed_type'] = tt
             #else:
                 #results_dict['match_type'] = None
             #results_dict['term'] = idscore_dict
             # sort terms dict by score
             results_dict['term'] = sorted(idscore_dict, key=lambda i: i['score'], reverse=True)
+            if results_dict['term']:
+                matched_term = results_dict['term'][0].get('name')
+                if len(f) > len(matched_term):
+                    results_dict['match_type'] = 'partial'
             term_jsn.append(results_dict)
 
     if ucum_jsn or term_jsn:
