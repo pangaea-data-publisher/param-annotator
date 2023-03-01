@@ -52,6 +52,7 @@ class Term:
                         'plus', 'others','nm', 'unknown','targeted with', 'spp.', 'given']
     pang_split_incl = ['downward', 'upward', 'size','juvenile','particulate organic carbon','normalized','mixing ratio','ratio',
                        'mean','minimum', 'maximum', 'standard deviation','fraction','minerals']
+    pang_split_incl =[]
     known_synonyms = {'Globigerinoides ruber sensu lato': 'Globigerinoides elongatus',
                       'Globigerinoides ruber sensu stricto':'Globigerinoides ruber subsp. albus',
                       'Neogloboquadrina pachyderma dextral':'Neogloboquadrina pachyderma subsp. dextralis'}
@@ -122,7 +123,7 @@ class Term:
         self.ptn_digit = r'(?:^|\s|\()[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?(?:$|\))'
         self.ptn_subreplace = r'(?:\s|^)({})(?:\s)'.format('|'.join(split_words))
         self.lat_num_brackets = r'\((?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})\)\s+$'
-        self.lat_num_unit = r'(\d+(?:\.\d*)?)((\s*\-\s*)(\d+(?:\.\d*)?))?\s*[A-Za-zÅµ]{1,3}'
+        self.lat_num_unit = r'(?:\s|^)(\d+(?:\.\d*)?)((\s*\-\s*)(\d+(?:\.\d*)?))?\s*[A-Za-zÅµ]{1,3}(?=\s|$)' #kills also 14C which is not good
 
     def initElasticSearch(self):
         if not self.elasticSearchInst:
@@ -141,7 +142,7 @@ class Term:
                 try:
                     pos_tag = nltk.pos_tag(string_to_process)
                     if pos_tag:
-                        print(pos_tag)
+                        #print(pos_tag)
                         if pos_tag[0][1] in ['VBN', 'ADJ','JJ','JJR','JJS','DT','RB','RBR','RBS','VBD']:
 
                             is_constraint = True
@@ -152,7 +153,7 @@ class Term:
 
     def is_quality_candidate(self, string_to_process):
         is_quality = False
-        standard_quantity = ['rate','ratio','mass','time','area','diameter','number','volume','height','weight','flux','age','content','index','pressure','factor','size']
+        standard_quantity = ['rate','ratio','mass','time','area','diameter','number','volume','height','level','range','weight','flux','age','content','index','pressure','factor','size']
         quantity_suffix_regex = r'(\w+\s)*\w+(ia|ty|ancy|ency|ance|ence|dom|ness|ship|tude|ion|ure|ment|osis|iasis|th)$'
         if re.match(quantity_suffix_regex, string_to_process):
             is_quality = True
@@ -191,44 +192,38 @@ class Term:
             if not re.search(r'\slato\s|\sstricto\s', string_to_process):
                 string_to_process = string_to_process.split("sensu", 1)[0].strip()'''
 
+        #handle brackets -> add a comma where apropriate to enable correct term splitting:
+        i=0
+        while '(' in string_to_process.strip() and i <= 10:
+            bms = re.findall(r'(?:\s|^|\)|/)\(([^\(\)]*)\)', string_to_process.strip())
+            for bm in bms:
+                if bm.isnumeric and len(bm) > 1:
+                    string_to_process = string_to_process.strip().replace('(' + bm + ')', ' , ' + bm + ' , ')
+            i += 1
+
         # split by puctuation followed by a space
         str_list = [a.strip() for a in re.split(r'\s?(?:\:|;|,|\s[\+-])\s(?![^()]*\))', string_to_process.strip()) if a]
 
         str_list_updated = []
         # if brac_match:
         #     str_list.append(brac_word.strip('()'))
-        print('LIST ', str_list)
 
         for i in str_list:
-            splitted = [x.strip() for x in re.split(self.ptn_splitword_all, i)  if x.strip()]
+            splitted = [x.strip().strip('/') for x in re.split(self.ptn_splitword_all, i)  if x.strip()]
             str_list_updated.extend(splitted)
-        print('LIST ', str_list_updated)
+        # first round of fragment identification, split by stopwords and punctuation and remove these,
+        # ignore single character fragments
         str_list_updated = [w for w in str_list_updated if not w in self.splitword_all_replace_only]
         for idx, a in enumerate(str_list_updated):
+            print(idx, a)
             str_list_updated[idx]= re.sub(self.ptn_subreplace,'',a).strip()
-        str_list_updated = [i for i in str_list_updated if len(i) > 1]  # remove fragment with a single character from list
-        bracketfragments = {}
-        print('LIST ',str_list_updated )
-        for idx, item in enumerate(str_list_updated):
-            token_type = None
-            matched = self.ptn_bracket.search(item)
-            #only extract word from thr brackets if the param does not contain ON qualifiers
-            #e.g. Bosmina (Eubosmina) cf. longispina but what about Bosmina (Eubosmina) longispina
-            #if matched and not re.search(self.ptn_pang_replace_onqual, item):
-            #if self.is_taxon_candidate(item):
-            #    print('taxcand: ',item)
-            if matched and not self.is_taxon_candidate(item):
-                found = matched.group(0).strip()  # (cf)
-                if len(found)> 4: # this includes brackets(2) and 2 char at max
-                    # do the split again
-                    #print(string_to_process,' || ',item)
-                    bracketfragments[idx] = self.extractParamFragment(item.replace('(',', ').replace(')',', ').strip(' ,'))
-                else:
-                    str_list_updated[idx] = item.replace(found, '')
-                #just to make sure nothing is lost:
-                #bracketfragments[idx].append({'token':item,'raw_token':item})
 
-        #new_list = []
+        str_list_updated = [i for i in str_list_updated if len(i) > 1]  # remove fragment with a single character from list
+
+        #bracketfragments = {}
+
+
+        #Second round of fragment identification, cleaning and setting up the dict:
         for ix, s in enumerate(str_list_updated):
             token_type = None
             if self.is_quality_candidate(s):
@@ -236,25 +231,41 @@ class Term:
             elif self.is_taxon_candidate(s):
                 token_type = 'taxon'
             st = re.sub(self.ptn_pang_replace, "", s.strip())
-            print('##### ', st)
-            # strip all positive, negative, and/or decimals, e.g., -1.23E+45
-            st = re.sub(self.ptn_digit, " ", st)
+            # strip/ignore all positive, negative, and/or decimals, e.g., -1.23E+45
+            #st = re.sub(self.ptn_digit, " ", st)
             st = re.sub(r'\(\s*'+self.ptn_digit+r'\s*\)', " ", st)
-            st = re.sub(self.lat_num_brackets, '', st)
-            st = re.sub(self.lat_num_unit, '', st)
+            #st = re.sub(self.lat_num_brackets, '', st)
+            #st = re.sub(self.lat_num_unit, '', st) # => a property
             st = re.sub('\s+', ' ', st).strip()
-            if bracketfragments.get(ix):
-                fragment_list.extend(bracketfragments[ix])
-            else:
-                fragment_list.append({'token':st, 'raw_token': s, 'type': token_type})
-        #split if just one slash, e.g., Krypton-84/Argon-36
 
+            fragment_list.append({'token':st, 'raw_token': s, 'type': token_type})
+
+        #Third round or fragmentig: split slashes and plus signs but carefully
+        new_fragment_list =[]
         for i, fr in enumerate(fragment_list):
+            # split and insert fragments by single slash
             if fr.get('token').count('/') == 1:
-                for slt in fr.get('token').split('/'):
-                    fragment_list.extend(self.extractParamFragment(slt))
-                    #fragment_list.append({'token': slt, 'raw_token': slt})
-                fragment_list.pop(i)
+                slsplit = fr.get('token').split('/')
+                new_fragment_list.extend([{'token':slsplit[0], 'raw_token':slsplit[0], 'type':None},
+                                            {'token':slsplit[1], 'raw_token':slsplit[1], 'type':None}])
+            else:
+                new_fragment_list.append(fr)
+        fragment_list = new_fragment_list
+
+        new_fragment_list = []
+        for i, fr in enumerate(fragment_list):
+            # split and insert fragments by plus or slash -> full latin letter words only
+            if re.fullmatch(r'^([A-Za-z]{2,}[\+/]?)+$', fr.get('token')):
+                fr_split = re.split('[\+/]', fr.get('token'))
+                if fr_split != [fr.get('token')]:
+                    for tnp in fr_split:
+                        if tnp:
+                            new_fragment_list.append({'token':tnp, 'raw_token':tnp, 'type':None})
+                else:
+                    new_fragment_list.append(fr)
+            else:
+                new_fragment_list.append(fr)
+        fragment_list = new_fragment_list
         #18-02-2020 filter out very short fragemnts
         filtered_tokens = [s for s in fragment_list if s.get('token') and len(s.get('token')) > self.min_length_frag]
         return filtered_tokens
@@ -285,12 +296,15 @@ class Term:
             print(e)
         return ucum_dict
 
-    def getIAdoptTermType(self, topics, terminology):
+    def getIAdoptTermType(self, terminfo):
+        topics = terminfo.get('search_terms')
+        terminology = terminfo.get('terminology_id')
+        #['search_terms'], hit['_source']['terminology_id']
         #topics are actually 'search_terms'
         if isinstance(topics, str):
             topics =[topics]
-        if len(topics) >=2:
-            print(topics[:10])
+        #if len(topics) >=2:
+        #    print(topics[:10])
         iadopt_type = 'ContextObject'
         if self.is_quality_candidate(topics[0]):
             iadopt_type = 'Property'
@@ -320,10 +334,10 @@ class Term:
         tparts = t.split(' ')
         if query_type == "fullmatch":
             q1 = Q({"multi_match": {"query": t, "fuzziness": 0, "fields":["name.fullmatch_exact^"+self.field_boost, "name.fullmatch_folding" ]}})
-        elif (query_type == "quality_fullmatch"):
+            '''elif (query_type == "quality_fullmatch"):
             q_a = Q({"multi_match": {"query": t, "fuzziness": 0, "fields":["name.fullmatch_exact^"+self.field_boost, "name.fullmatch_folding" ]}})
             q_b = Q({"multi_match": {"query": tparts[-1], "fuzziness": 0, "fields":["name.fullmatch_exact^"+self.field_boost, "name.fullmatch_folding" ]}})
-            q1 = Q('bool', should=[q_a, q_b])
+            q1 = Q('bool', should=[q_a, q_b])'''
         elif (query_type == "taxon_fullmatch"):
             #species so also try to finde names with optional subgenus parts
             if len(tparts) == 2:
@@ -372,15 +386,16 @@ class Term:
             response = response.to_dict()
             #print("%d documents found" % response ['hits']['total'])
             for hit in response['hits']['hits']:
-                token_match_similarity = 100
+                token_match_similarity = 0
+                word_similarity = self.get_word_similarity(str(hit['_source']['name']), str(t))
                 try:
                     token_match_similarity = fuzz.ratio(str(hit['_source']['name']), str(t))
                 except Exception as e:
                     print(e)
                 someoverlap = False
-                if any(nn in hit['_source']['name'].split(' ') for nn in t.split(' ')):
+                if any(nn in hit['_source']['name'].lower().split(' ') for nn in t.lower().split(' ')):
                     someoverlap = True
-                if  someoverlap:
+                if someoverlap:
                     dictres = {"id": int(hit['_id']), "name": hit['_source']['name'],"abbreviation": hit['_source']['abbreviation'],
                                "score": hit['_score'],"terminology": hit['_source']['terminology'],
                                "terminology_id": hit['_source']['terminology_id']}
@@ -389,8 +404,10 @@ class Term:
                     if 'topics' in hit['_source']:
                         dictres['topics'] = hit['_source']['topics']
                     if 'search_terms' in hit['_source']:
-                        termtype = self.getIAdoptTermType(hit['_source']['search_terms'], hit['_source']['terminology_id'])
+                        termtype = self.getIAdoptTermType(hit['_source'])
                         dictres['iadopt_type'] = termtype
+                    dictres['similarity']  = token_match_similarity
+                    dictres['similarity2'] = word_similarity
                     list_res.append(dictres)
 
             if list_res:
@@ -459,6 +476,17 @@ class Term:
             for subset in itertools.combinations(list_ids, i):
                 tuples_list.append(subset)
         return tuples_list
+
+    def get_word_similarity(self, str1, str2):
+        lst1 = str1.lower().split(' ')
+        lst2 = str2.lower().split(' ')
+        # calculate score for comparing lists of words
+        c = sum(el in lst1 for el in lst2)
+        if (len(lst1) == 0 or len(lst2) == 0):
+            retval = 0.0
+        else:
+            retval = 0.5 * (c / len(lst1) + c / len(lst2))
+        return round(retval,2)
 
     def get_cosine(self,vec1, vec2):
         intersection = set(vec1.keys()) & set(vec2.keys()) #set duplicates will beeliminated
