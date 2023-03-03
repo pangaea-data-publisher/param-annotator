@@ -94,7 +94,7 @@ class Term:
         self.prefix_length = plength
         self.field_boost=boost
         self.min_length_frag = fraglen
-        self.elasticurl_tokenizer_ids= "%s/%s/_mtermvectors" % (self.elastic_url, urllib.parse.quote(self.elastic_index))
+        self.elasticurl_tokenizer_ids= "%s/%s/%s/_mtermvectors" % (self.elastic_url, urllib.parse.quote(self.elastic_index), urllib.parse.quote(self.elastic_doctype))
         self.elasticurl_tokenizer_str = "%s/%s/_analyze?field=name.tokenmatch_folding&text=" % (self.elastic_url, urllib.parse.quote(self.elastic_index))
         self.terminologies_dict=termsdict
 
