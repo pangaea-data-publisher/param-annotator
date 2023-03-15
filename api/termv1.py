@@ -245,12 +245,9 @@ class Term:
             response = response.to_dict()
             #print("%d documents found" % response ['hits']['total'])
             for hit in response['hits']['hits']:
-                dictres = {"id": int(hit['_id']), "name": hit['_source']['name'],"abbreviation": hit['_source']['abbreviation'],
-                                     "score": hit['_score'],"terminology": hit['_source']['terminology']}
-                if 'description_uri' in hit['_source']:
-                    dictres['description_uri']=hit['_source']['description_uri']
-                if 'topics' in hit['_source']:
-                    dictres['topics'] = hit['_source']['topics']
+                dictres = { "id": int(hit['_id']), "score": hit['_score'], **hit['_source'] }
+                for k in ('search_terms', 'internal-source', 'internal-datestamp'):
+                    dictres.pop(k, None)
                 list_res.append(dictres)
 
             if list_res:
