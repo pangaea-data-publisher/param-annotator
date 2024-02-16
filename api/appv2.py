@@ -208,7 +208,7 @@ if __name__ == '__main__':
     min_sim_value = float(config['INPUT']['min_sim_value'])
     match_field_boost = config.get("INPUT", "match_field_boost")
     min_length_frag = int(config['INPUT']['min_frag_length'])
-    termInstance = termv1.Term(ucum_service, elastic_url, elastic_index, elastic_doctype, query_size_full,
+    termInstance = termv2.Term(ucum_service, elastic_url, elastic_index, elastic_doctype, query_size_full,
                                query_size_shingle, query_size_shingle_return,min_sim_value, prefix_length,
                                min_should_match, match_field_boost,min_length_frag,terminologies_boost_dict)#
 
