@@ -7,5 +7,8 @@ stop_words
 xlrd
 python-levenshtein
 openpyxl
+regex
+spacy
 elasticsearch>=6.0.0,<7.0.0
 elasticsearch-dsl>=6.0.0,<7.0.0
+en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
