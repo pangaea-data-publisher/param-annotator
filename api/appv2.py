@@ -1,7 +1,7 @@
 from flask import request
 import json
 import logging
-import termv1
+import termv2
 import configparser as ConfigParser
 import operator
 import os
@@ -94,39 +94,39 @@ def getTerm():
                     logging.debug('Final param after units extraction : %s', paramName)
 
     #get term - full, fuzzy and shing match for name
-    list_fragments = termInstance.extractParamFragment(paramName)
+
+
+    list_fragments = termInstance.extractParamFragmentNew(paramName)
+    #tokens = t.extractParamFragment(test_term)
     #logging.info("Param Fragments: " ,list_fragments)
     #logging.info("Param Fragments: {}".format(' '.join(str(e.encode('utf-8')) for (e) in list_fragments)))
-    logging.debug(u"Param Fragments: %s" % [g['token'].encode('ascii', 'ignore') for g in list_fragments])
-    #print('list_fragments ',list_fragments)
+    logging.debug(u"Param Fragments: %s" % [g['fragment'].encode('ascii', 'ignore') for g in list_fragments])
+    print('list_fragments ',list_fragments)
+    covered_fragments = []
     if list_fragments:
         for fr in list_fragments:
-            f = fr.get('token')
-            tt = fr.get('type')
-            startIndex = None
-            endIndex = None
+            f = fr.get('fragment')
+            shingle_on = fr.get('shingle_active')
             match_type = None
             idscore_dict = None
             # full match w/o fuzzy
-            if tt == 'taxon':
-                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'taxon_fullmatch')
-                match_type = 'full'
-            elif tt == 'quality':
-                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'quality_fullmatch')
-                match_type = 'full'
-            else:
+            try:
+                if shingle_on:
+                    # activate shingle for last search
+                    shingle_active = "true"
                 idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'fullmatch')
                 match_type = 'full'
-            if not idscore_dict:
-                # full match with fuzzy
-                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'fuzzy_fullmatch')
-                match_type = 'fuzzy'
-            if not idscore_dict and shingle_active=="true":
-                # shingle match
-                match_type = 'shingle'
-                idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'shinglematch')
+                if not idscore_dict:
+                    # full match with fuzzy
+                    idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'fuzzy_fullmatch')
+                    match_type = 'fuzzy'
+                if not idscore_dict and shingle_active=="true":
+                    # shingle match
+                    match_type = 'shingle'
+                    idscore_dict = termInstance.executeTermQuery(f, user_terminolgy, 'shinglematch')
+            except Exception as e:
+                print('Elastic Query Error: ', e)
             results_dict = {}
-
             if f in paramName:
                 startIndex = paramName.index(f)
                 endIndex = startIndex + len(f)
@@ -135,18 +135,19 @@ def getTerm():
                 startIndex = paramName.index(word_list[0])
                 endIndex = paramName.index(word_list[-1])+len(word_list[-1])
 
+
             results_dict['fragment'] = f
             results_dict['start_offset'] = startIndex
             results_dict['end_offset'] = endIndex
             #if idscore_dict: comment out on 27-02-2020
 
             results_dict['match_type'] = match_type
-            results_dict['guessed_type'] = tt
+            #results_dict['guessed_type'] = tt
             #else:
                 #results_dict['match_type'] = None
             #results_dict['term'] = idscore_dict
             # sort terms dict by score
-            results_dict['term'] = sorted(idscore_dict, key=lambda i: i['score'], reverse=True)
+            results_dict['term'] = sorted(idscore_dict, key=lambda i: (i['similarity'],i['score']), reverse=True)
             if results_dict['term']:
                 matched_term = results_dict['term'][0].get('name')
                 if len(f) > len(matched_term):
@@ -176,6 +177,7 @@ if __name__ == '__main__':
     args = ap.parse_args()
     config = configparser.ConfigParser()
     config.read(args.config)
+    print(dict(config))
 
     ucum_service = config['INPUT']['ucum_service']
     elastic_url = config['INPUT']['elastic_url']
