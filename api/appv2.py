@@ -1,7 +1,7 @@
 from flask import request
 import json
 import logging
-import termv1
+import termv2
 import configparser as ConfigParser
 import operator
 import os
