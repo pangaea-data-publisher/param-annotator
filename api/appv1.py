@@ -7,12 +7,14 @@ import operator
 import os
 import re
 from flask import Flask
+from flask_cors import CORS
 import pandas as pd
 import configparser
 import argparse
 
 # Create the application instance
 app = Flask(__name__)
+CORS(app)
 
 termInstance = None
 dftopic = None

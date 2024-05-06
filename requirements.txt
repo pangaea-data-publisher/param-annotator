@@ -3,6 +3,7 @@ nltk
 fuzzywuzzy
 pandas
 flask
+flask-cors
 stop_words
 xlrd
 python-levenshtein
