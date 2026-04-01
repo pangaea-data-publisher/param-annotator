@@ -1,2 +1,2 @@
 #!/bin/sh
-/usr/bin/daemon -n param-annotator --stop
+exec systemctl --user stop param-annotator

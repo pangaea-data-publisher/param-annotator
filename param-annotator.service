@@ -1,0 +1,14 @@
+[Unit]
+Description=PANGAEA Parameter Annotator
+After=network.target pucum.service
+Wants=pucum.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/param-annotator
+Restart=always
+ExecStart=/bin/bash
+StandardInputText=source "%h/.profile"; exec python3 api/appv1.py -c ./config/termconf-production.ini
+
+[Install]
+WantedBy=default.target

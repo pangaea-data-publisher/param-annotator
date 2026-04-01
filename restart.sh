@@ -1,2 +1,2 @@
 #!/bin/sh
-/usr/bin/daemon -n param-annotator --restart
+exec systemctl --user restart param-annotator

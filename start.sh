@@ -1,5 +1,2 @@
 #!/bin/sh
-
-cd `dirname $0`
-exec /usr/bin/daemon -o daemon.info -r -n param-annotator -i -D "$PWD" -- \
- python3 api/appv1.py -c ./config/termconf-production.ini
+exec systemctl --user start param-annotator
